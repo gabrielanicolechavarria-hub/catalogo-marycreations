@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaryCreations — Catálogo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg: #FBF3FA;
+    --bg-alt: #F1DEF0;
+    --card: #FFFFFF;
+    --ink: #3E2350;
+    --ink-soft: #7C6389;
+    --primary: #C43D91;
+    --primary-dark: #9C2C74;
+    --accent: #7A5FD1;
+    --sage: #7A5FD1;
+    --line: #E7D3E8;
+    --danger: #B03A5B;
+    --celeste: #8FD3E8;
+    --fucsia: #E0499E;
+    --lila: #B98FE0;
+    --aqua: #8FE8D3;
+    --radius: 4px;
+    --serif: 'Fraunces', serif;
+    --sans: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+    padding-bottom:90px;
+  }
+  a{color:inherit;}
+  button{font-family:inherit; cursor:pointer;}
+
+  /* Header */
+  header.site{
+    padding:28px 20px 20px;
+    text-align:center;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,var(--bg-alt),var(--bg));
+    position:relative;
+  }
+  header.site .brand{
+    font-family:var(--serif);
+    font-weight:700;
+    font-size:2rem;
+    letter-spacing:0.01em;
+    margin:0;
+    color:#F6A8D6;
+    -webkit-text-stroke:1px #FFFFFF;
+    text-shadow:
+      -1px -1px 0 #fff, 1px -1px 0 #fff,
+      -1px 1px 0 #fff, 1px 1px 0 #fff;
+  }
+  header.site .tagline{
+    margin:6px 0 0;
+    font-size:0.85rem;
+    color:var(--ink-soft);
+    font-style:italic;
+    font-family:var(--serif);
+  }
+  .admin-toggle{
+    position:absolute; top:16px; right:14px;
+    background:none; border:1px solid var(--line);
+    border-radius:50%; width:34px; height:34px;
+    font-size:1rem; color:var(--ink-soft);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .admin-toggle:active{background:var(--bg-alt);}
+
+  /* Tabs */
+  nav.tabs{
+    display:flex; gap:0; margin:18px 20px 6px;
+    border-bottom:1px solid var(--line);
+  }
+  nav.tabs button{
+    flex:1; background:none; border:none; padding:10px 6px 12px;
+    font-size:0.92rem; color:var(--ink-soft); font-weight:600;
+    border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  nav.tabs button.active{ color:var(--primary); border-bottom-color:var(--primary);}
+
+  main{ padding:6px 20px 30px; max-width:640px; margin:0 auto;}
+
+  /* Category chips */
+  .chips{ display:flex; gap:8px; overflow-x:auto; padding:14px 0 4px; }
+  .chip{
+    flex:none; padding:6px 14px; border-radius:999px;
+    border:1px solid var(--line); background:var(--card);
+    font-size:0.8rem; color:var(--ink-soft); white-space:nowrap;
+  }
+  .chip.active{ background:var(--primary); color:#fff; border-color:var(--primary);}
+
+  /* Product grid */
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    overflow:hidden; display:flex; flex-direction:column; position:relative;
+  }
+  .card .tagdot{
+    position:absolute; top:10px; left:10px; width:8px; height:8px; border-radius:50%;
+    background:var(--sage); z-index:2;
+  }
+  .card .tagdot.c0{ background:var(--celeste); }
+  .card .tagdot.c1{ background:var(--fucsia); }
+  .card .tagdot.c2{ background:var(--lila); }
+  .card .tagdot.c3{ background:var(--aqua); }
+  .card .photo{
+    width:100%; aspect-ratio:1/1; background:var(--bg-alt);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--serif); font-size:1.6rem; color:var(--accent);
+    overflow:hidden;
+  }
+  .card .photo img{ width:100%; height:100%; object-fit:cover;}
+  .card .info{ padding:10px 12px 12px; display:flex; flex-direction:column; gap:4px; flex:1;}
+  .card .name{ font-family:var(--serif); font-weight:600; font-size:0.95rem; line-height:1.25;}
+  .card .desc{ font-size:0.74rem; color:var(--ink-soft); line-height:1.3; min-height:1.3em;}
+  .card .price{ font-family:var(--serif); color:var(--accent); font-weight:600; font-size:0.98rem; margin-top:auto;}
+  .card .addrow{ display:flex; align-items:center; gap:8px; margin-top:6px;}
+  .stepper{ display:flex; align-items:center; border:1px solid var(--line); border-radius:999px; overflow:hidden;}
+  .stepper button{ background:none; border:none; width:26px; height:26px; font-size:0.95rem; color:var(--primary);}
+  .stepper span{ min-width:20px; text-align:center; font-size:0.82rem;}
+  .add-btn{
+    flex:1; background:var(--primary); color:#fff; border:none; border-radius:999px;
+    padding:7px 8px; font-size:0.78rem; font-weight:600;
+  }
+  .add-btn:active{ background:var(--primary-dark);}
+  .empty-state{
+    text-align:center; padding:40px 10px; color:var(--ink-soft); font-size:0.9rem;
+  }
+
+  /* Custom order tab */
+  .custom-box{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; margin-top:16px;
+  }
+  .custom-box h2{ font-family:var(--serif); font-size:1.15rem; margin:0 0 6px; color:var(--primary-dark);}
+  .custom-box p.hint{ font-size:0.82rem; color:var(--ink-soft); margin:0 0 14px; line-height:1.4;}
+  label{ font-size:0.8rem; font-weight:600; color:var(--ink-soft); display:block; margin:12px 0 4px;}
+  input[type=text], input[type=tel], textarea, input[type=number], input[type=url]{
+    width:100%; border:1px solid var(--line); border-radius:var(--radius);
+    padding:10px 11px; font-size:0.92rem; font-family:var(--sans); background:#fff; color:var(--ink);
+  }
+  textarea{ min-height:110px; resize:vertical;}
+  .primary-btn{
+    width:100%; background:var(--primary); color:#fff; border:none; border-radius:999px;
+    padding:13px; font-size:0.92rem; font-weight:700; margin-top:16px;
+  }
+  .primary-btn:active{ background:var(--primary-dark);}
+  .primary-btn:disabled{ background:#C9BFC2; }
+
+  /* Cart floating button */
+  .cart-fab{
+    position:fixed; bottom:18px; left:20px; right:20px; max-width:600px; margin:0 auto;
+    background:var(--primary-dark); color:#fff; border:none; border-radius:999px;
+    padding:14px 20px; display:flex; justify-content:space-between; align-items:center;
+    font-size:0.92rem; font-weight:600; box-shadow:0 6px 20px rgba(59,31,43,0.25);
+    z-index:40;
+  }
+  .cart-fab.hidden{ display:none;}
+
+  /* Modal / drawer */
+  .overlay{
+    position:fixed; inset:0; background:rgba(59,31,43,0.4); z-index:100;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .overlay.hidden{ display:none;}
+  .sheet{
+    background:var(--bg); width:100%; max-width:640px; max-height:88vh; overflow-y:auto;
+    border-radius:16px 16px 0 0; padding:20px 20px 26px;
+  }
+  .sheet-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  .sheet-header h2{ font-family:var(--serif); font-size:1.2rem; margin:0; color:var(--primary-dark);}
+  .close-btn{ background:none; border:none; font-size:1.3rem; color:var(--ink-soft); line-height:1;}
+
+  .cart-item{ display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); align-items:center;}
+  .cart-item .ci-info{ flex:1;}
+  .cart-item .ci-name{ font-weight:600; font-size:0.9rem;}
+  .cart-item .ci-price{ font-size:0.78rem; color:var(--ink-soft); margin-top:2px;}
+  .cart-item .remove{ background:none; border:none; color:var(--danger); font-size:0.78rem; margin-top:4px;}
+
+  .cart-total{ display:flex; justify-content:space-between; align-items:center; padding:16px 0 4px; font-family:var(--serif); font-size:1.2rem; font-weight:700; color:var(--primary-dark);}
+
+  /* Admin */
+  .admin-section{ margin-bottom:22px;}
+  .admin-section h3{ font-family:var(--serif); font-size:1rem; color:var(--primary-dark); margin:0 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px;}
+  .admin-product-row{ display:flex; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);}
+  .admin-product-row .api-info{ flex:1;}
+  .admin-product-row .api-name{ font-weight:600; font-size:0.88rem;}
+  .admin-product-row .api-meta{ font-size:0.74rem; color:var(--ink-soft);}
+  .icon-btn{ background:none; border:1px solid var(--line); border-radius:6px; padding:6px 9px; font-size:0.8rem; color:var(--ink-soft);}
+  .icon-btn.danger{ color:var(--danger); border-color:#E8C9C2;}
+  .field-row{ display:flex; gap:10px;}
+  .field-row > div{ flex:1;}
+  .small-note{ font-size:0.74rem; color:var(--ink-soft); margin-top:4px; line-height:1.35;}
+  .pin-gate{ text-align:center; padding:40px 10px;}
+  .pin-gate input{ text-align:center; letter-spacing:4px; font-size:1.2rem; margin-top:14px;}
+  .toast{
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:0.82rem; z-index:200; opacity:0; transition:opacity 0.25s;
+    pointer-events:none;
+  }
+  .toast.show{ opacity:1;}
+  .loading{ text-align:center; padding:50px 10px; color:var(--ink-soft); font-size:0.9rem;}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <button class="admin-toggle" id="adminToggle" title="Modo administrador">⚙</button>
+  <p class="brand" id="brandName">MaryCreations</p>
+  <p class="tagline">Catálogo hecho a mano, a tu pedido</p>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-tab="catalog">Catálogo</button>
+  <button data-tab="custom">Pedido a la medida</button>
+</nav>
+
+<main>
+  <div id="view-catalog">
+    <div class="chips" id="chips"></div>
+    <div id="grid" class="grid"></div>
+  </div>
+
+  <div id="view-custom" style="display:none;">
+    <div class="custom-box">
+      <h2>¿Buscás algo especial?</h2>
+      <p class="hint">Contanos qué necesitás, color, tamaño, fecha para cuándo lo querés, etc. Le llega directo a MaryCreations y te responde con el precio.</p>
+      <p class="hint" style="color:var(--accent); font-weight:600;">Recordá: todo pedido personalizado se agenda con el 50% de anticipo.</p>
+      <label for="custName">Tu nombre</label>
+      <input type="text" id="custName" placeholder="Ej. Ana López">
+      <label for="custDesc">Describí tu pedido</label>
+      <textarea id="custDesc" placeholder="Ej. Quiero una figurita para un pastel, tema unicornio, tonos morados, para el 20 de septiembre..."></textarea>
+      <label for="custPhotos">Fotos de referencia (opcional)</label>
+      <input type="file" accept="image/*" multiple id="custPhotos">
+      <div id="custPhotosPreview" style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;"></div>
+      <button class="primary-btn" id="sendCustomBtn">Enviar por WhatsApp</button>
+    </div>
+  </div>
+</main>
+
+<button class="cart-fab hidden" id="cartFab">
+  <span id="cartCount">0 productos</span>
+  <span id="cartTotal">$0.00</span>
+</button>
+
+<!-- Cart drawer -->
+<div class="overlay hidden" id="cartOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <h2>Tu pedido</h2>
+      <button class="close-btn" id="closeCart">✕</button>
+    </div>
+    <div id="cartItems"></div>
+    <div class="cart-total"><span>Total</span><span id="cartTotalBig">$0.00</span></div>
+    <p class="small-note" style="color:var(--accent); font-weight:600;">Recordá: todo pedido se agenda de preferencia con el 50% de anticipo.</p>
+    <button class="primary-btn" id="sendCartBtn">Enviar pedido por WhatsApp</button>
+  </div>
+</div>
+
+<!-- Admin drawer -->
+<div class="overlay hidden" id="adminOverlay">
+  <div class="sheet">
+    <div class="sheet-header">
+      <h2>Panel de MaryCreations</h2>
+      <button class="close-btn" id="closeAdmin">✕</button>
+    </div>
+    <div id="adminBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // 👇 PEGA AQUÍ TU firebaseConfig, tal cual te lo da la consola de Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyDRvLsVoDOL7SqeD1BpB0YRj52HuZErj5c",
+    authDomain: "marycreations-2e9bf.firebaseapp.com",
+    projectId: "marycreations-2e9bf",
+    storageBucket: "marycreations-2e9bf.firebasestorage.app",
+    messagingSenderId: "916440724445",
+    appId: "1:916440724445:web:cfdd899a8b9c1538bc7c34"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const DEFAULT_PIN = "1234";
+  let products = [];
+  let settings = { whatsappNumber: "", businessName: "MaryCreations", pin: DEFAULT_PIN };
+  let cart = {}; // {productId: qty}
+  let activeCategory = "Todos";
+  let adminUnlocked = false;
+  let dataLoaded = false;
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  function toast(msg){
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"), 2200);
+  }
+
+  function money(n){
+    return "$" + (Math.round(n*100)/100).toFixed(2);
+  }
+
+  function resizeImage(file, maxDim, quality){
+    maxDim = maxDim || 800; quality = quality || 0.72;
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          let w = img.width, h = img.height;
+          if(w > h){ if(w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; } }
+          else { if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; } }
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = () => reject(new Error("No se pudo leer la imagen"));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  let pendingPhotoData = "";
+  let editPhotoData = "";
+
+  function dataURLtoBlob(dataURL){
+    const parts = dataURL.split(",");
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const binary = atob(parts[1]);
+    const arr = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) arr[i] = binary.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
+
+  function loadImageEl(src){
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = ()=>resolve(img);
+      img.onerror = ()=>reject(new Error("no se pudo cargar imagen"));
+      img.src = src;
+    });
+  }
+
+  async function buildOrderSummaryImage(entries){
+    const rowH = 112, width = 700, headerH = 92, footerH = 80;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = headerH + entries.length*rowH + footerH;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FBF3FA"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#C43D91";
+    ctx.font = "bold 30px Georgia, serif";
+    ctx.fillText(settings.businessName || "MaryCreations", 24, 46);
+    ctx.fillStyle = "#7C6389";
+    ctx.font = "16px Arial";
+    ctx.fillText("Resumen de pedido", 24, 72);
+    let y = headerH;
+    for(const {p, qty} of entries){
+      if(p.photoUrl){
+        try{ const img = await loadImageEl(p.photoUrl); ctx.drawImage(img, 24, y+6, 90, 90); }
+        catch(e){ ctx.fillStyle="#F1DEF0"; ctx.fillRect(24,y+6,90,90); }
+      } else { ctx.fillStyle="#F1DEF0"; ctx.fillRect(24,y+6,90,90); }
+      ctx.fillStyle = "#3E2350";
+      ctx.font = "bold 20px Arial";
+      ctx.fillText(p.name, 128, y+36);
+      ctx.fillStyle = "#7C6389";
+      ctx.font = "16px Arial";
+      ctx.fillText("Cantidad: " + qty, 128, y+60);
+      ctx.fillStyle = "#7A5FD1";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText(money(p.price*qty), 128, y+86);
+      y += rowH;
+      ctx.strokeStyle = "#E7D3E8";
+      ctx.beginPath(); ctx.moveTo(24, y-10); ctx.lineTo(width-24, y-10); ctx.stroke();
+    }
+    ctx.fillStyle = "#3E2350";
+    ctx.font = "bold 26px Georgia, serif";
+    ctx.fillText("Total: " + money(cartTotal()), 24, y+36);
+    ctx.fillStyle = "#C43D91";
+    ctx.font = "14px Arial";
+    ctx.fillText("Recordá: todo pedido se agenda con el 50% de anticipo.", 24, y+62);
+    return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  }
+
+  function uid(){
+    return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  const EXAMPLE_PRODUCTS = [
+    { id: uid(), name: "Dije mariposa", price: 3.50, category: "Dijes", description: "Pasta flexible, colores a elegir", photoUrl: "" },
+    { id: uid(), name: "Aplique de moño", price: 2.00, category: "Apliques", description: "Para ganchos o diademas", photoUrl: "" },
+    { id: uid(), name: "Taza decorada temática", price: 8.00, category: "Tazas", description: "Diseño a elegir, cerámica", photoUrl: "" }
+  ];
+
+  async function loadData(){
+    try{
+      const snap = await db.collection("marycreations_products").get();
+      products = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    }catch(e){ products = []; toast("No se pudo conectar a la base de datos"); }
+
+    if(products.length === 0){
+      try{
+        for(const p of EXAMPLE_PRODUCTS){
+          const { id, ...data } = p;
+          await db.collection("marycreations_products").add(data);
+        }
+        const snap2 = await db.collection("marycreations_products").get();
+        products = snap2.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      }catch(e){ /* sin conexión inicial, se queda vacío */ }
+    }
+
+    try{
+      const doc = await db.collection("marycreations_settings").doc("main").get();
+      if(doc.exists) settings = Object.assign(settings, doc.data());
+    }catch(e){ /* keep defaults */ }
+
+    dataLoaded = true;
+    $("#brandName").textContent = settings.businessName || "MaryCreations";
+    renderChips();
+    renderGrid();
+  }
+
+  async function saveSettings(){
+    try{
+      await db.collection("marycreations_settings").doc("main").set(settings);
+    }catch(e){ toast("No se pudo guardar la configuración."); }
+  }
+
+  // ---------- Tabs ----------
+  $$("nav.tabs button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      $$("nav.tabs button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      $("#view-catalog").style.display = tab === "catalog" ? "block" : "none";
+      $("#view-custom").style.display = tab === "custom" ? "block" : "none";
+    });
+  });
+
+  // ---------- Catalog rendering ----------
+  function categories(){
+    const set = new Set(products.map(p=>p.category || "Otros"));
+    return ["Todos", ...Array.from(set)];
+  }
+
+  function renderChips(){
+    const wrap = $("#chips");
+    wrap.innerHTML = "";
+    categories().forEach(cat=>{
+      const chip = document.createElement("button");
+      chip.className = "chip" + (cat === activeCategory ? " active" : "");
+      chip.textContent = cat;
+      chip.addEventListener("click", ()=>{ activeCategory = cat; renderChips(); renderGrid(); });
+      wrap.appendChild(chip);
+    });
+  }
+
+  function categoryDotClass(cat){
+    const colors = ["c0","c1","c2","c3"];
+    let hash = 0;
+    for(let i=0;i<(cat||"").length;i++){ hash = (hash*31 + cat.charCodeAt(i)) % colors.length; }
+    return colors[hash];
+  }
+
+  function renderGrid(){
+    const grid = $("#grid");
+    if(!dataLoaded){
+      grid.innerHTML = '<div class="loading">Cargando catálogo…</div>';
+      return;
+    }
+    const list = products.filter(p => activeCategory === "Todos" || (p.category||"Otros") === activeCategory);
+    if(list.length === 0){
+      grid.innerHTML = '<div class="empty-state">Todavía no hay productos en esta categoría.</div>';
+      return;
+    }
+    grid.innerHTML = "";
+    list.forEach(p=>{
+      const qty = cart[p.id] || 0;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <span class="tagdot ${categoryDotClass(p.category||"Otros")}"></span>
+        <div class="photo">${p.photoUrl ? `<img src="${escapeAttr(p.photoUrl)}" alt="${escapeAttr(p.name)}">` : "✦"}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(p.name)}</div>
+          <div class="desc">${escapeHtml(p.description||"")}</div>
+          <div class="price">${money(p.price)}</div>
+          <div class="addrow">
+            <div class="stepper">
+              <button data-act="dec">−</button>
+              <span>${qty}</span>
+              <button data-act="inc">+</button>
+            </div>
+            <button class="add-btn" data-act="add">Agregar</button>
+          </div>
+        </div>
+      `;
+      card.querySelector('[data-act="dec"]').addEventListener("click", ()=>{
+        changeQty(p.id, -1); renderGrid();
+      });
+      card.querySelector('[data-act="inc"]').addEventListener("click", ()=>{
+        changeQty(p.id, 1); renderGrid();
+      });
+      card.querySelector('[data-act="add"]').addEventListener("click", ()=>{
+        if(!cart[p.id]) changeQty(p.id, 1);
+        renderGrid(); updateCartFab();
+        toast(p.name + " agregado");
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  function changeQty(id, delta){
+    const next = (cart[id]||0) + delta;
+    if(next <= 0){ delete cart[id]; } else { cart[id] = next; }
+    updateCartFab();
+  }
+
+  function escapeHtml(str){
+    return (str||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function escapeAttr(str){ return escapeHtml(str); }
+
+  // ---------- Cart ----------
+  function cartEntries(){
+    return Object.entries(cart).map(([id,qty])=>{
+      const p = products.find(x=>x.id===id);
+      return p ? {p, qty} : null;
+    }).filter(Boolean);
+  }
+
+  function cartTotal(){
+    return cartEntries().reduce((sum,{p,qty})=>sum + p.price*qty, 0);
+  }
+
+  function updateCartFab(){
+    const entries = cartEntries();
+    const count = entries.reduce((s,{qty})=>s+qty,0);
+    const fab = $("#cartFab");
+    if(count === 0){ fab.classList.add("hidden"); return; }
+    fab.classList.remove("hidden");
+    $("#cartCount").textContent = count + (count===1 ? " producto" : " productos");
+    $("#cartTotal").textContent = money(cartTotal());
+  }
+
+  function renderCartDrawer(){
+    const wrap = $("#cartItems");
+    const entries = cartEntries();
+    if(entries.length === 0){
+      wrap.innerHTML = '<div class="empty-state">Tu carrito está vacío.</div>';
+    } else {
+      wrap.innerHTML = "";
+      entries.forEach(({p,qty})=>{
+        const row = document.createElement("div");
+        row.className = "cart-item";
+        row.innerHTML = `
+          <div class="ci-info">
+            <div class="ci-name">${escapeHtml(p.name)}</div>
+            <div class="ci-price">${qty} x ${money(p.price)} = ${money(p.price*qty)}</div>
+            <button class="remove" data-id="${p.id}">Quitar</button>
+          </div>
+          <div class="stepper">
+            <button data-act="dec" data-id="${p.id}">−</button>
+            <span>${qty}</span>
+            <button data-act="inc" data-id="${p.id}">+</button>
+          </div>
+        `;
+        wrap.appendChild(row);
+      });
+      wrap.querySelectorAll('[data-act="dec"]').forEach(b=>b.addEventListener("click",()=>{ changeQty(b.dataset.id,-1); renderCartDrawer(); updateCartFab(); }));
+      wrap.querySelectorAll('[data-act="inc"]').forEach(b=>b.addEventListener("click",()=>{ changeQty(b.dataset.id,1); renderCartDrawer(); updateCartFab(); }));
+      wrap.querySelectorAll('.remove').forEach(b=>b.addEventListener("click",()=>{ delete cart[b.dataset.id]; renderCartDrawer(); updateCartFab(); renderGrid(); }));
+    }
+    $("#cartTotalBig").textContent = money(cartTotal());
+  }
+
+  $("#cartFab").addEventListener("click", ()=>{
+    renderCartDrawer();
+    $("#cartOverlay").classList.remove("hidden");
+  });
+  $("#closeCart").addEventListener("click", ()=> $("#cartOverlay").classList.add("hidden"));
+  $("#cartOverlay").addEventListener("click", (e)=>{ if(e.target.id==="cartOverlay") $("#cartOverlay").classList.add("hidden"); });
+
+  function waLink(number, text){
+    const clean = (number||"").replace(/[^0-9]/g,"");
+    return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
+  }
+
+  $("#sendCartBtn").addEventListener("click", async ()=>{
+    const entries = cartEntries();
+    if(entries.length === 0){ toast("Agregá al menos un producto"); return; }
+    if(!settings.whatsappNumber){ toast("Falta configurar el número de WhatsApp en el panel de administración"); return; }
+    let msg = `Hola ${settings.businessName || "MaryCreations"}, quiero hacer este pedido:\n\n`;
+    entries.forEach(({p,qty})=>{
+      msg += `• ${p.name} x${qty} — ${money(p.price*qty)}\n`;
+    });
+    msg += `\nTotal: ${money(cartTotal())}\n\n(Pedido con foto adjunta del catálogo)`;
+    try{
+      const blob = await buildOrderSummaryImage(entries);
+      const file = new File([blob], "pedido-marycreations.jpg", { type: "image/jpeg" });
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        await navigator.share({ files: [file], text: msg, title: "Pedido MaryCreations" });
+        return;
+      }
+    }catch(e){ /* si falla, se manda solo el texto */ }
+    window.open(waLink(settings.whatsappNumber, msg), "_blank");
+  });
+
+  let customOrderPhotos = [];
+  $("#custPhotos").addEventListener("change", async (e)=>{
+    const files = Array.from(e.target.files).slice(0,4);
+    customOrderPhotos = [];
+    $("#custPhotosPreview").innerHTML = '<span class="small-note">Procesando fotos…</span>';
+    for(const f of files){
+      try{ customOrderPhotos.push(await resizeImage(f, 700, 0.7)); }catch(err){}
+    }
+    $("#custPhotosPreview").innerHTML = customOrderPhotos.map(d=>
+      `<img src="${d}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">`
+    ).join("");
+  });
+
+  $("#sendCustomBtn").addEventListener("click", async ()=>{
+    const name = $("#custName").value.trim();
+    const desc = $("#custDesc").value.trim();
+    if(!desc){ toast("Contanos qué necesitás"); return; }
+    if(!settings.whatsappNumber){ toast("Falta configurar el número de WhatsApp en el panel de administración"); return; }
+    let msg = `Hola ${settings.businessName || "MaryCreations"}, quiero un pedido personalizado.\n\n`;
+    if(name) msg += `Nombre: ${name}\n`;
+    msg += `Detalle: ${desc}\n\nRecordá: todo pedido se agenda con el 50% de anticipo.`;
+    if(customOrderPhotos.length > 0){
+      try{
+        const files = customOrderPhotos.map((d,i)=> new File([dataURLtoBlob(d)], `referencia-${i+1}.jpg`, { type:"image/jpeg" }));
+        if(navigator.canShare && navigator.canShare({ files })){
+          await navigator.share({ files, text: msg, title: "Pedido personalizado MaryCreations" });
+          return;
+        }
+      }catch(e){ /* si falla, se manda solo el texto */ }
+    }
+    window.open(waLink(settings.whatsappNumber, msg), "_blank");
+  });
+
+  // ---------- Admin ----------
+  $("#adminToggle").addEventListener("click", ()=>{
+    adminUnlocked = false;
+    renderAdmin();
+    $("#adminOverlay").classList.remove("hidden");
+  });
+  $("#closeAdmin").addEventListener("click", ()=> $("#adminOverlay").classList.add("hidden"));
+  $("#adminOverlay").addEventListener("click", (e)=>{ if(e.target.id==="adminOverlay") $("#adminOverlay").classList.add("hidden"); });
+
+  function renderAdmin(){
+    const body = $("#adminBody");
+    if(!adminUnlocked){
+      body.innerHTML = `
+        <div class="pin-gate">
+          <p>Ingresá el PIN de administrador para agregar o quitar productos.</p>
+          <input type="text" inputmode="numeric" id="pinInput" maxlength="6" placeholder="••••">
+          <button class="primary-btn" id="pinSubmit">Entrar</button>
+        </div>
+      `;
+      $("#pinSubmit").addEventListener("click", ()=>{
+        const val = $("#pinInput").value.trim();
+        if(val === (settings.pin || DEFAULT_PIN)){
+          adminUnlocked = true;
+          renderAdmin();
+        } else {
+          toast("PIN incorrecto");
+        }
+      });
+      return;
+    }
+
+    pendingPhotoData = "";
+    body.innerHTML = `
+        <label>Nombre del negocio</label>
+        <input type="text" id="setBizName" value="${escapeAttr(settings.businessName)}">
+        <label>Número de WhatsApp (con código de país, ej. 50370001234)</label>
+        <input type="tel" id="setWaNumber" value="${escapeAttr(settings.whatsappNumber)}" placeholder="50370001234">
+        <p class="small-note">Aquí llegan los pedidos y los pedidos personalizados. Sin este número, las clientas no van a poder enviar sus pedidos.</p>
+        <label>Cambiar PIN de administrador</label>
+        <input type="text" id="setPin" value="${escapeAttr(settings.pin || DEFAULT_PIN)}" maxlength="6">
+        <button class="primary-btn" id="saveSettingsBtn">Guardar configuración</button>
+      </div>
+
+      <div class="admin-section">
+        <h3>Agregar producto</h3>
+        <label>Nombre</label>
+        <input type="text" id="npName" placeholder="Ej. Arreglo floral primavera">
+        <div class="field-row">
+          <div>
+            <label>Precio (USD)</label>
+            <input type="number" id="npPrice" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div>
+            <label>Categoría</label>
+            <input type="text" id="npCategory" placeholder="Ej. Apliques, Decorativos, Tazas, Dijes">
+          </div>
+        </div>
+        <label>Descripción corta (opcional)</label>
+        <input type="text" id="npDesc" placeholder="Ej. Rosas y follaje natural">
+        <label>Foto (opcional)</label>
+        <input type="file" accept="image/*" id="npPhotoFile">
+        <div id="npPhotoPreview" style="margin-top:8px;"></div>
+        <p class="small-note">Tomá la foto o elegila de la galería del celular.</p>
+        <button class="primary-btn" id="addProductBtn">Agregar al catálogo</button>
+      </div>
+
+      <div class="admin-section">
+        <h3>Productos actuales (${products.length})</h3>
+        <div id="adminProductList"></div>
+      </div>
+    `;
+
+    $("#saveSettingsBtn").addEventListener("click", async ()=>{
+      settings.businessName = $("#setBizName").value.trim() || "MaryCreations";
+      settings.whatsappNumber = $("#setWaNumber").value.trim();
+      settings.pin = $("#setPin").value.trim() || DEFAULT_PIN;
+      await saveSettings();
+      $("#brandName").textContent = settings.businessName;
+      toast("Configuración guardada");
+    });
+
+    $("#npPhotoFile").addEventListener("change", async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      $("#npPhotoPreview").innerHTML = '<span class="small-note">Procesando foto…</span>';
+      try{
+        pendingPhotoData = await resizeImage(file);
+        $("#npPhotoPreview").innerHTML = `<img src="${pendingPhotoData}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">`;
+      }catch(err){
+        toast("No se pudo procesar la foto");
+        $("#npPhotoPreview").innerHTML = "";
+      }
+    });
+
+    $("#addProductBtn").addEventListener("click", async ()=>{
+      const name = $("#npName").value.trim();
+      const price = parseFloat($("#npPrice").value);
+      const category = $("#npCategory").value.trim() || "Otros";
+      const description = $("#npDesc").value.trim();
+      const photoUrl = pendingPhotoData;
+      if(!name || isNaN(price) || price < 0){
+        toast("Poné al menos el nombre y un precio válido");
+        return;
+      }
+      try{
+        const ref = await db.collection("marycreations_products").add({ name, price, category, description, photoUrl });
+        products.push({ id: ref.id, name, price, category, description, photoUrl });
+      }catch(e){ toast("No se pudo guardar. Revisá tu conexión."); return; }
+      $("#npName").value=""; $("#npPrice").value=""; $("#npCategory").value="";
+      $("#npDesc").value=""; $("#npPhotoFile").value=""; $("#npPhotoPreview").innerHTML="";
+      pendingPhotoData = "";
+      renderAdminProductList();
+      renderChips(); renderGrid();
+      toast("Producto agregado");
+    });
+
+    renderAdminProductList();
+  }
+
+  function renderAdminProductList(){
+    const wrap = $("#adminProductList");
+    if(!wrap) return;
+    if(products.length === 0){
+      wrap.innerHTML = '<p class="small-note">Todavía no agregás productos.</p>';
+      return;
+    }
+    wrap.innerHTML = "";
+    products.forEach(p=>{
+      const row = document.createElement("div");
+      row.className = "admin-product-row";
+      row.innerHTML = `
+        <div class="api-info">
+          <div class="api-name">${escapeHtml(p.name)}</div>
+          <div class="api-meta">${escapeHtml(p.category||"Otros")} · ${money(p.price)}</div>
+        </div>
+        <button class="icon-btn" data-act="edit">Editar</button>
+        <button class="icon-btn danger" data-act="del">Quitar</button>
+      `;
+      row.querySelector('[data-act="del"]').addEventListener("click", async ()=>{
+        try{ await db.collection("marycreations_products").doc(p.id).delete(); }
+        catch(e){ toast("No se pudo eliminar. Revisá tu conexión."); return; }
+        products = products.filter(x=>x.id!==p.id);
+        delete cart[p.id];
+        renderAdminProductList(); renderChips(); renderGrid(); updateCartFab();
+        toast("Producto eliminado");
+      });
+      row.querySelector('[data-act="edit"]').addEventListener("click", ()=>{
+        openEditForm(p);
+      });
+      wrap.appendChild(row);
+    });
+  }
+
+  function openEditForm(p){
+    const wrap = $("#adminProductList");
+    const editBox = document.createElement("div");
+    editBox.style.padding = "12px 0";
+    editBox.style.borderBottom = "1px solid var(--line)";
+    editBox.innerHTML = `
+      <label>Nombre</label>
+      <input type="text" id="epName" value="${escapeAttr(p.name)}">
+      <div class="field-row">
+        <div>
+          <label>Precio (USD)</label>
+          <input type="number" id="epPrice" min="0" step="0.01" value="${p.price}">
+        </div>
+        <div>
+          <label>Categoría</label>
+          <input type="text" id="epCategory" value="${escapeAttr(p.category||"")}">
+        </div>
+      </div>
+      <label>Descripción</label>
+      <input type="text" id="epDesc" value="${escapeAttr(p.description||"")}">
+      <label>Foto</label>
+      <input type="file" accept="image/*" id="epPhotoFile">
+      <div id="epPhotoPreview" style="margin-top:8px;">${p.photoUrl ? `<img src="${p.photoUrl}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">` : '<span class="small-note">Sin foto</span>'}</div>
+      <button class="primary-btn" id="epSave">Guardar cambios</button>
+    `;
+    wrap.innerHTML = "";
+    wrap.appendChild(editBox);
+    editPhotoData = p.photoUrl || "";
+    $("#epPhotoFile").addEventListener("change", async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      $("#epPhotoPreview").innerHTML = '<span class="small-note">Procesando foto…</span>';
+      try{
+        editPhotoData = await resizeImage(file);
+        $("#epPhotoPreview").innerHTML = `<img src="${editPhotoData}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">`;
+      }catch(err){
+        toast("No se pudo procesar la foto");
+      }
+    });
+    $("#epSave").addEventListener("click", async ()=>{
+      const price = parseFloat($("#epPrice").value);
+      if(!$("#epName").value.trim() || isNaN(price) || price < 0){
+        toast("Revisá el nombre y el precio"); return;
+      }
+      const updated = {
+        name: $("#epName").value.trim(),
+        price: price,
+        category: $("#epCategory").value.trim() || "Otros",
+        description: $("#epDesc").value.trim(),
+        photoUrl: editPhotoData
+      };
+      try{ await db.collection("marycreations_products").doc(p.id).set(updated); }
+      catch(e){ toast("No se pudo guardar. Revisá tu conexión."); return; }
+      Object.assign(p, updated);
+      renderAdminProductList(); renderChips(); renderGrid();
+      toast("Producto actualizado");
+    });
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
