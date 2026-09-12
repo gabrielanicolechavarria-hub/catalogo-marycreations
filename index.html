@@ -315,11 +315,11 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  function toast(msg){
+  function toast(msg, duration){
     const t = $("#toast");
     t.textContent = msg;
     t.classList.add("show");
-    setTimeout(()=>t.classList.remove("show"), 2200);
+    setTimeout(()=>t.classList.remove("show"), duration || 2200);
   }
 
   function money(n){
@@ -656,9 +656,11 @@
     msg += `\nTotal: ${money(cartTotal())}`;
     const withPhotos = entries.filter(({p})=>p.photoUrl);
     if(withPhotos.length > 0){
-      toast("Guardando fotos del pedido…");
       const saved = await downloadPhotos(withPhotos);
-      if(saved > 0) msg += `\n\n(Te adjunto las fotos que se acaban de descargar)`;
+      if(saved > 0){
+        toast("📷 Fotos guardadas en tu dispositivo — adjúntalas en el chat", 3200);
+        await new Promise(r=>setTimeout(r, 1400));
+      }
     }
     window.open(waLink(settings.whatsappNumber, msg), "_blank");
   });
@@ -685,11 +687,11 @@
     if(name) msg += `Nombre: ${name}\n`;
     msg += `Detalle: ${desc}\n\nRecordá: todo pedido se agenda con el 50% de anticipo.`;
     if(customOrderPhotos.length > 0){
-      toast("Guardando fotos de referencia…");
       customOrderPhotos.forEach((d,i)=>{
         downloadDataUrl(d, `referencia-${i+1}.jpg`);
       });
-      msg += `\n\n(Te adjunto las fotos de referencia que se acaban de descargar)`;
+      toast("📷 Fotos guardadas en tu dispositivo — adjúntalas en el chat", 3200);
+      await new Promise(r=>setTimeout(r, 1400));
     }
     window.open(waLink(settings.whatsappNumber, msg), "_blank");
   });
