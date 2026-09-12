@@ -111,6 +111,15 @@
   .card .tagdot.c1{ background:var(--fucsia); }
   .card .tagdot.c2{ background:var(--lila); }
   .card .tagdot.c3{ background:var(--aqua); }
+  .card .admin-controls{
+    position:absolute; top:8px; right:8px; display:flex; gap:6px; z-index:3;
+  }
+  .card .admin-controls button{
+    width:26px; height:26px; border-radius:50%; border:1px solid var(--line);
+    background:rgba(255,255,255,0.92); font-size:0.85rem; display:flex;
+    align-items:center; justify-content:center; color:var(--primary-dark);
+  }
+  .card .admin-controls button.del, .card .admin-controls button[data-act="delcard"]{ color:var(--danger); }
   .card .photo{
     width:100%; aspect-ratio:1/1; background:var(--bg-alt);
     display:flex; align-items:center; justify-content:center;
@@ -191,6 +200,8 @@
   .admin-section{ margin-bottom:22px;}
   .admin-section h3{ font-family:var(--serif); font-size:1rem; color:var(--primary-dark); margin:0 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px;}
   .admin-product-row{ display:flex; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);}
+  .admin-product-row .api-thumb{ width:44px; height:44px; border-radius:6px; overflow:hidden; background:var(--bg-alt); flex:none; display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:1.1rem;}
+  .admin-product-row .api-thumb img{ width:100%; height:100%; object-fit:cover;}
   .admin-product-row .api-info{ flex:1;}
   .admin-product-row .api-name{ font-weight:600; font-size:0.88rem;}
   .admin-product-row .api-meta{ font-size:0.74rem; color:var(--ink-soft);}
@@ -315,7 +326,38 @@
     return "$" + (Math.round(n*100)/100).toFixed(2);
   }
 
-  function resizeImage(file, maxDim, quality){
+  function drawWatermark(ctx, w, h, text){
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#3E2350";
+    const fontSize = Math.max(14, Math.round(w * 0.075));
+    ctx.font = "bold " + fontSize + "px Arial";
+    ctx.textBaseline = "middle";
+    ctx.translate(w/2, h/2);
+    ctx.rotate(-Math.PI/6);
+    const label = text || "MaryCreations";
+    const textWidth = ctx.measureText(label).width;
+    const spacingX = textWidth + 46;
+    const spacingY = fontSize + 46;
+    const span = Math.max(w, h) * 1.5;
+    for(let y = -span; y < span; y += spacingY){
+      for(let x = -span; x < span; x += spacingX){
+        ctx.fillText(label, x, y);
+      }
+    }
+    ctx.restore();
+  }
+
+  function loadImageSrc(src){
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.onload = ()=>resolve(img);
+      img.onerror = ()=>reject(new Error("No se pudo cargar la imagen"));
+      img.src = src;
+    });
+  }
+
+  function resizeImage(file, maxDim, quality, withWatermark){
     maxDim = maxDim || 800; quality = quality || 0.72;
     return new Promise((resolve, reject)=>{
       const reader = new FileReader();
@@ -327,7 +369,9 @@
           else { if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; } }
           const canvas = document.createElement("canvas");
           canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          if(withWatermark) drawWatermark(ctx, w, h, "MaryCreations");
           resolve(canvas.toDataURL("image/jpeg", quality));
         };
         img.onerror = () => reject(new Error("No se pudo leer la imagen"));
@@ -449,6 +493,10 @@
       card.className = "card";
       card.innerHTML = `
         <span class="tagdot ${categoryDotClass(p.category||"Otros")}"></span>
+        ${adminUnlocked ? `<div class="admin-controls">
+          <button data-act="editcard" title="Editar">✎</button>
+          <button data-act="delcard" title="Quitar">✕</button>
+        </div>` : ""}
         <div class="photo">${p.photoUrl ? `<img src="${escapeAttr(p.photoUrl)}" alt="${escapeAttr(p.name)}">` : "✦"}</div>
         <div class="info">
           <div class="name">${escapeHtml(p.name)}</div>
@@ -470,6 +518,16 @@
       card.querySelector('[data-act="inc"]').addEventListener("click", ()=>{
         changeQty(p.id, 1); renderGrid();
       });
+      if(adminUnlocked){
+        card.querySelector('[data-act="editcard"]').addEventListener("click", (e)=>{
+          e.stopPropagation();
+          openEditFromCatalog(p);
+        });
+        card.querySelector('[data-act="delcard"]').addEventListener("click", (e)=>{
+          e.stopPropagation();
+          if(confirm(`¿Quitar "${p.name}" del catálogo?`)) deleteProductById(p);
+        });
+      }
       card.querySelector('[data-act="add"]').addEventListener("click", ()=>{
         if(!cart[p.id]) changeQty(p.id, 1);
         renderGrid(); updateCartFab();
@@ -555,6 +613,38 @@
     return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
   }
 
+  function downloadDataUrl(dataUrl, filename){
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  async function downloadPhotos(photoEntries){
+    let count = 0;
+    for(const { p } of photoEntries){
+      if(!p.photoUrl) continue;
+      try{
+        let dataUrl = p.photoUrl;
+        if(!dataUrl.startsWith("data:")){
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          dataUrl = await new Promise(resolve=>{
+            const reader = new FileReader();
+            reader.onload = ()=>resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+        }
+        downloadDataUrl(dataUrl, (p.name||"producto").replace(/[^a-z0-9]/gi,"_") + ".jpg");
+        count++;
+        await new Promise(r=>setTimeout(r, 250));
+      }catch(e){ /* si una foto falla, seguimos con las demás */ }
+    }
+    return count;
+  }
+
   $("#sendCartBtn").addEventListener("click", async ()=>{
     const entries = cartEntries();
     if(entries.length === 0){ toast("Agregá al menos un producto"); return; }
@@ -564,22 +654,12 @@
       msg += `• ${p.name} x${qty} — ${money(p.price*qty)}\n`;
     });
     msg += `\nTotal: ${money(cartTotal())}`;
-    try{
-      const files = [];
-      for(const {p} of entries){
-        if(!p.photoUrl) continue;
-        try{
-          let blob;
-          if(p.photoUrl.startsWith("data:")){ blob = dataURLtoBlob(p.photoUrl); }
-          else{ const res = await fetch(p.photoUrl); blob = await res.blob(); }
-          files.push(new File([blob], (p.name||"producto").replace(/[^a-z0-9]/gi,"_") + ".jpg", { type: blob.type || "image/jpeg" }));
-        }catch(e){ /* si falla una foto, se sigue con las demás */ }
-      }
-      if(files.length > 0 && navigator.canShare && navigator.canShare({ files })){
-        await navigator.share({ files, text: msg, title: "Pedido MaryCreations" });
-        return;
-      }
-    }catch(e){ /* si falla, se manda solo el texto */ }
+    const withPhotos = entries.filter(({p})=>p.photoUrl);
+    if(withPhotos.length > 0){
+      toast("Guardando fotos del pedido…");
+      const saved = await downloadPhotos(withPhotos);
+      if(saved > 0) msg += `\n\n(Te adjunto las fotos que se acaban de descargar)`;
+    }
     window.open(waLink(settings.whatsappNumber, msg), "_blank");
   });
 
@@ -605,25 +685,38 @@
     if(name) msg += `Nombre: ${name}\n`;
     msg += `Detalle: ${desc}\n\nRecordá: todo pedido se agenda con el 50% de anticipo.`;
     if(customOrderPhotos.length > 0){
-      try{
-        const files = customOrderPhotos.map((d,i)=> new File([dataURLtoBlob(d)], `referencia-${i+1}.jpg`, { type:"image/jpeg" }));
-        if(navigator.canShare && navigator.canShare({ files })){
-          await navigator.share({ files, text: msg, title: "Pedido personalizado MaryCreations" });
-          return;
-        }
-      }catch(e){ /* si falla, se manda solo el texto */ }
+      toast("Guardando fotos de referencia…");
+      customOrderPhotos.forEach((d,i)=>{
+        downloadDataUrl(d, `referencia-${i+1}.jpg`);
+      });
+      msg += `\n\n(Te adjunto las fotos de referencia que se acaban de descargar)`;
     }
     window.open(waLink(settings.whatsappNumber, msg), "_blank");
   });
 
   // ---------- Admin ----------
   $("#adminToggle").addEventListener("click", ()=>{
-    adminUnlocked = false;
     renderAdmin();
     $("#adminOverlay").classList.remove("hidden");
   });
   $("#closeAdmin").addEventListener("click", ()=> $("#adminOverlay").classList.add("hidden"));
   $("#adminOverlay").addEventListener("click", (e)=>{ if(e.target.id==="adminOverlay") $("#adminOverlay").classList.add("hidden"); });
+
+  async function deleteProductById(p){
+    try{ await db.collection("marycreations_products").doc(p.id).delete(); }
+    catch(e){ toast("No se pudo eliminar. Revisá tu conexión."); return; }
+    products = products.filter(x=>x.id!==p.id);
+    delete cart[p.id];
+    renderChips(); renderGrid(); updateCartFab();
+    if($("#adminProductList")) renderAdminProductList();
+    toast("Producto eliminado");
+  }
+
+  function openEditFromCatalog(p){
+    renderAdmin();
+    $("#adminOverlay").classList.remove("hidden");
+    openEditForm(p);
+  }
 
   function renderAdmin(){
     const body = $("#adminBody");
@@ -640,6 +733,7 @@
         if(val === (settings.pin || DEFAULT_PIN)){
           adminUnlocked = true;
           renderAdmin();
+          renderGrid();
         } else {
           toast("PIN incorrecto");
         }
@@ -683,10 +777,46 @@
       </div>
 
       <div class="admin-section">
+        <h3>Marca de agua</h3>
+        <p class="small-note">Las fotos nuevas ya llevan la marca "MaryCreations" automáticamente. Para ponérsela a las fotos que ya subiste antes, dale clic aquí (puede tardar un poco si son muchas):</p>
+        <button class="icon-btn" id="watermarkAllBtn" style="width:100%; padding:10px;">Aplicar marca de agua a fotos existentes</button>
+        <p class="small-note" id="watermarkStatus"></p>
+      </div>
+
+      <div class="admin-section">
         <h3>Productos actuales (${products.length})</h3>
         <div id="adminProductList"></div>
       </div>
     `;
+
+    $("#watermarkAllBtn").addEventListener("click", async ()=>{
+      const withPhoto = products.filter(p=>p.photoUrl);
+      if(withPhoto.length === 0){ toast("No hay fotos para marcar"); return; }
+      $("#watermarkStatus").textContent = `Procesando 0 de ${withPhoto.length}…`;
+      let done = 0, failed = 0;
+      for(const p of withPhoto){
+        try{
+          const img = await loadImageSrc(p.photoUrl);
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width; canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          drawWatermark(ctx, canvas.width, canvas.height, "MaryCreations");
+          const newPhoto = canvas.toDataURL("image/jpeg", 0.75);
+          await db.collection("marycreations_products").doc(p.id).set({
+            name: p.name, price: p.price, category: p.category, description: p.description, photoUrl: newPhoto
+          });
+          p.photoUrl = newPhoto;
+        }catch(e){ failed++; }
+        done++;
+        $("#watermarkStatus").textContent = `Procesando ${done} de ${withPhoto.length}…`;
+      }
+      $("#watermarkStatus").textContent = failed > 0
+        ? `Listo, con ${failed} foto(s) que no se pudieron procesar.`
+        : "¡Listo! Todas las fotos ya tienen la marca de agua.";
+      renderGrid();
+      toast("Marca de agua aplicada");
+    });
 
     $("#saveSettingsBtn").addEventListener("click", async ()=>{
       settings.businessName = $("#setBizName").value.trim() || "MaryCreations";
@@ -702,7 +832,7 @@
       if(!file) return;
       $("#npPhotoPreview").innerHTML = '<span class="small-note">Procesando foto…</span>';
       try{
-        pendingPhotoData = await resizeImage(file);
+        pendingPhotoData = await resizeImage(file, 800, 0.72, true);
         $("#npPhotoPreview").innerHTML = `<img src="${pendingPhotoData}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">`;
       }catch(err){
         toast("No se pudo procesar la foto");
@@ -747,6 +877,7 @@
       const row = document.createElement("div");
       row.className = "admin-product-row";
       row.innerHTML = `
+        <div class="api-thumb">${p.photoUrl ? `<img src="${escapeAttr(p.photoUrl)}" alt="">` : '<span>✦</span>'}</div>
         <div class="api-info">
           <div class="api-name">${escapeHtml(p.name)}</div>
           <div class="api-meta">${escapeHtml(p.category||"Otros")} · ${money(p.price)}</div>
@@ -754,13 +885,8 @@
         <button class="icon-btn" data-act="edit">Editar</button>
         <button class="icon-btn danger" data-act="del">Quitar</button>
       `;
-      row.querySelector('[data-act="del"]').addEventListener("click", async ()=>{
-        try{ await db.collection("marycreations_products").doc(p.id).delete(); }
-        catch(e){ toast("No se pudo eliminar. Revisá tu conexión."); return; }
-        products = products.filter(x=>x.id!==p.id);
-        delete cart[p.id];
-        renderAdminProductList(); renderChips(); renderGrid(); updateCartFab();
-        toast("Producto eliminado");
+      row.querySelector('[data-act="del"]').addEventListener("click", ()=>{
+        if(confirm(`¿Quitar "${p.name}" del catálogo?`)) deleteProductById(p);
       });
       row.querySelector('[data-act="edit"]').addEventListener("click", ()=>{
         openEditForm(p);
@@ -802,7 +928,7 @@
       if(!file) return;
       $("#epPhotoPreview").innerHTML = '<span class="small-note">Procesando foto…</span>';
       try{
-        editPhotoData = await resizeImage(file);
+        editPhotoData = await resizeImage(file, 800, 0.72, true);
         $("#epPhotoPreview").innerHTML = `<img src="${editPhotoData}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">`;
       }catch(err){
         toast("No se pudo procesar la foto");
