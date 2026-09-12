@@ -743,6 +743,10 @@
 
     pendingPhotoData = "";
     body.innerHTML = `
+      <button class="icon-btn" id="logoutAdminBtn" style="width:100%; padding:10px; margin-bottom:18px; color:var(--danger); border-color:#E8C9C2;">Cerrar sesión de administrador</button>
+
+      <div class="admin-section">
+        <h3>Datos del negocio</h3>
         <label>Nombre del negocio</label>
         <input type="text" id="setBizName" value="${escapeAttr(settings.businessName)}">
         <label>Número de WhatsApp (con código de país, ej. 50370001234)</label>
@@ -816,6 +820,13 @@
         : "¡Listo! Todas las fotos ya tienen la marca de agua.";
       renderGrid();
       toast("Marca de agua aplicada");
+    });
+
+    $("#logoutAdminBtn").addEventListener("click", ()=>{
+      adminUnlocked = false;
+      $("#adminOverlay").classList.add("hidden");
+      renderGrid();
+      toast("Sesión de administrador cerrada");
     });
 
     $("#saveSettingsBtn").addEventListener("click", async ()=>{
