@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <style>
   :root{
     --bg: #FBF3FA;
@@ -253,6 +254,7 @@
     <input type="text" id="gateName" placeholder="Ej. Ana López">
     <label for="gatePhone">Tu teléfono</label>
     <input type="tel" id="gatePhone" placeholder="Ej. 7000-1234">
+    <p class="small-note" style="margin-top:8px; text-align:left;">Usamos tu nombre y teléfono solo para identificar tu pedido y contactarte por tu compra. No se comparten con nadie más.</p>
     <button class="primary-btn" id="gateSubmitBtn">Entrar al catálogo</button>
     <p class="small-note" id="gateError" style="color:var(--danger); min-height:16px;"></p>
     <p class="small-note" style="margin-top:14px;">¿Sos la administradora? <a href="#" id="gateAdminSkip" style="color:var(--primary); font-weight:600;">Entrar sin registrarte</a></p>
@@ -354,6 +356,18 @@
   }catch(e){ /* si Analytics no está listo, el catálogo sigue funcionando igual */ }
 
   const DEFAULT_PIN = "1234";
+  // 👇 Cuenta técnica de administradora (creada en Firebase Authentication).
+  // Se usa por detrás del PIN para desbloquear el acceso real a los datos protegidos.
+  const ADMIN_EMAIL = "PEGA_AQUI_EL_CORREO";
+  const ADMIN_PASSWORD = "PEGA_AQUI_LA_CONTRASEÑA";
+
+  async function signInAdmin(){
+    try{
+      if(ADMIN_EMAIL.startsWith("PEGA_AQUI")) return; // todavía no configurado
+      await firebase.auth().signInWithEmailAndPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
+    }catch(e){ /* si falla, el PIN igual desbloquea la vista, pero los reportes protegidos no cargarán */ }
+  }
+
   let products = [];
   let settings = { whatsappNumber: "", businessName: "MaryCreations", pin: DEFAULT_PIN };
   let cart = {}; // {productId: qty}
@@ -375,6 +389,14 @@
     return "$" + (Math.round(n*100)/100).toFixed(2);
   }
 
+  async function logVisit(name, phone){
+    try{
+      await db.collection("marycreations_visits").add({
+        name, phone, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){ /* si falla el registro, igual dejamos ver el catálogo */ }
+  }
+
   function initEntryGate(){
     const KEY = "mc_visitor";
     const gate = $("#entryGate");
@@ -389,7 +411,12 @@
       gate.classList.add("hidden");
       try{
         const v = JSON.parse(saved);
-        if(!v.admin) fillOrderForms(v.name, v.phone);
+        if(!v.admin){
+          fillOrderForms(v.name, v.phone);
+          logVisit(v.name, v.phone);
+        }else{
+          signInAdmin();
+        }
       }catch(e){}
       return;
     }
@@ -401,6 +428,7 @@
       if(pin.trim() === (settings.pin || DEFAULT_PIN)){
         localStorage.setItem(KEY, JSON.stringify({ admin: true }));
         gate.classList.add("hidden");
+        signInAdmin();
       }else{
         $("#gateError").textContent = "PIN incorrecto.";
       }
@@ -415,11 +443,7 @@
       localStorage.setItem(KEY, JSON.stringify({ name, phone }));
       fillOrderForms(name, phone);
       gate.classList.add("hidden");
-      try{
-        await db.collection("marycreations_visits").add({
-          name, phone, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }catch(e){ /* si falla el registro, igual dejamos ver el catálogo */ }
+      logVisit(name, phone);
     });
   }
 
@@ -861,6 +885,7 @@
         const val = $("#pinInput").value.trim();
         if(val === (settings.pin || DEFAULT_PIN)){
           adminUnlocked = true;
+          signInAdmin();
           renderAdmin();
           renderGrid();
         } else {
@@ -970,6 +995,7 @@
 
     $("#logoutAdminBtn").addEventListener("click", ()=>{
       adminUnlocked = false;
+      try{ firebase.auth().signOut(); }catch(e){}
       $("#adminOverlay").classList.add("hidden");
       renderGrid();
       toast("Sesión de administrador cerrada");
