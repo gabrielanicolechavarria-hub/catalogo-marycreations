@@ -358,8 +358,8 @@
   const DEFAULT_PIN = "1234";
   // 👇 Cuenta técnica de administradora (creada en Firebase Authentication).
   // Se usa por detrás del PIN para desbloquear el acceso real a los datos protegidos.
-  const ADMIN_EMAIL = "maricela.gonzalez.vasquez.rei@gmail.com";
-  const ADMIN_PASSWORD = "nicol1980";
+  const ADMIN_EMAIL = "PEGA_AQUI_EL_CORREO";
+  const ADMIN_PASSWORD = "PEGA_AQUI_LA_CONTRASEÑA";
 
   async function signInAdmin(){
     try{
@@ -587,6 +587,45 @@
       chip.addEventListener("click", ()=>{ activeCategory = cat; renderChips(); renderGrid(); });
       wrap.appendChild(chip);
     });
+  }
+
+  function existingCategories(){
+    const set = new Set(products.map(p=>p.category || "Otros"));
+    return Array.from(set).sort((a,b)=>a.localeCompare(b, "es"));
+  }
+
+  // Arma un <select> con las categorías ya existentes + opción "Nueva categoría",
+  // y un input de texto (oculto salvo que se elija "Nueva categoría") para escribirla.
+  function categoryPickerHtml(selectId, newInputId, currentValue){
+    const cats = existingCategories();
+    const isNew = (!!currentValue && !cats.includes(currentValue)) || cats.length === 0;
+    let opts = cats.map(c =>
+      `<option value="${escapeAttr(c)}"${c === currentValue ? " selected" : ""}>${escapeHtml(c)}</option>`
+    ).join("");
+    opts += `<option value="__new__"${isNew ? " selected" : ""}>+ Nueva categoría…</option>`;
+    return `
+      <select id="${selectId}">${opts}</select>
+      <input type="text" id="${newInputId}" placeholder="Escribí el nombre de la nueva categoría"
+        style="margin-top:8px; display:${isNew ? "block" : "none"};" value="${(currentValue && isNew) ? escapeAttr(currentValue) : ""}">
+    `;
+  }
+
+  function wireCategoryPicker(selectId, newInputId){
+    const sel = $("#"+selectId);
+    const newInput = $("#"+newInputId);
+    sel.addEventListener("change", ()=>{
+      const isNew = sel.value === "__new__";
+      newInput.style.display = isNew ? "block" : "none";
+      if(isNew) newInput.focus();
+    });
+  }
+
+  function getCategoryValue(selectId, newInputId){
+    const sel = $("#"+selectId);
+    if(sel.value === "__new__"){
+      return $("#"+newInputId).value.trim() || "Otros";
+    }
+    return sel.value || "Otros";
   }
 
   function categoryDotClass(cat){
@@ -922,7 +961,7 @@
           </div>
           <div>
             <label>Categoría</label>
-            <input type="text" id="npCategory" placeholder="Ej. Apliques, Decorativos, Tazas, Dijes">
+            ${categoryPickerHtml("npCategory", "npCategoryNew", "")}
           </div>
         </div>
         <label>Descripción corta (opcional)</label>
@@ -1023,10 +1062,12 @@
       }
     });
 
+    wireCategoryPicker("npCategory", "npCategoryNew");
+
     $("#addProductBtn").addEventListener("click", async ()=>{
       const name = $("#npName").value.trim();
       const price = parseFloat($("#npPrice").value);
-      const category = $("#npCategory").value.trim() || "Otros";
+      const category = getCategoryValue("npCategory", "npCategoryNew");
       const description = $("#npDesc").value.trim();
       const photoUrl = pendingPhotoData;
       if(!name || isNaN(price) || price < 0){
@@ -1037,10 +1078,8 @@
         const ref = await db.collection("marycreations_products").add({ name, price, category, description, photoUrl });
         products.push({ id: ref.id, name, price, category, description, photoUrl });
       }catch(e){ toast("No se pudo guardar. Revisá tu conexión."); return; }
-      $("#npName").value=""; $("#npPrice").value=""; $("#npCategory").value="";
-      $("#npDesc").value=""; $("#npPhotoFile").value=""; $("#npPhotoPreview").innerHTML="";
       pendingPhotoData = "";
-      renderAdminProductList();
+      renderAdmin();
       renderChips(); renderGrid();
       toast("Producto agregado");
     });
@@ -1155,7 +1194,7 @@
         </div>
         <div>
           <label>Categoría</label>
-          <input type="text" id="epCategory" value="${escapeAttr(p.category||"")}">
+          ${categoryPickerHtml("epCategory", "epCategoryNew", p.category || "")}
         </div>
       </div>
       <label>Descripción</label>
@@ -1168,6 +1207,7 @@
     wrap.innerHTML = "";
     wrap.appendChild(editBox);
     editPhotoData = p.photoUrl || "";
+    wireCategoryPicker("epCategory", "epCategoryNew");
     $("#epPhotoFile").addEventListener("change", async (e)=>{
       const file = e.target.files[0];
       if(!file) return;
@@ -1187,7 +1227,7 @@
       const updated = {
         name: $("#epName").value.trim(),
         price: price,
-        category: $("#epCategory").value.trim() || "Otros",
+        category: getCategoryValue("epCategory", "epCategoryNew"),
         description: $("#epDesc").value.trim(),
         photoUrl: editPhotoData
       };
